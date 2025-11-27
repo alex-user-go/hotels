@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  provider1:
+    build: .
+    command: ./provider
+    environment:
+      - PORT=9001
+      - PROVIDER_TYPE=mock1
+    ports:
+      - "9001:9001"
+    networks:
+      - hotel-network
+
+  provider2:
+    build: .
+    command: ./provider
+    environment:
+      - PORT=9002
+      - PROVIDER_TYPE=mock2
+    ports:
+      - "9002:9002"
+    networks:
+      - hotel-network
+
+  provider3:
+    build: .
+    command: ./provider
+    environment:
+      - PORT=9003
+      - PROVIDER_TYPE=mock3
+    ports:
+      - "9003:9003"
+    networks:
+      - hotel-network
+
+  server:
+    build: .
+    command: ./server
+    environment:
+      - PROVIDER1_URL=http://provider1:9001
+      - PROVIDER2_URL=http://provider2:9002
+      - PROVIDER3_URL=http://provider3:9003
+    ports:
+      - "8080:8080"
+    depends_on:
+      - provider1
+      - provider2
+      - provider3
+    networks:
+      - hotel-network
+
+networks:
+  hotel-network:
+    driver: bridge
