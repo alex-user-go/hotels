@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alex-user-go/hotels/internal/search"
+	"github.com/alex-user-go/hotels/internal/search/types"
 )
 
 func TestCache_Key(t *testing.T) {
@@ -64,8 +64,8 @@ func TestCache_GetOrFetch(t *testing.T) {
 		name       string
 		setup      func(c *Cache)
 		key        string
-		fetchFunc  func() (*search.Result, error)
-		wantResult *search.Result
+		fetchFunc  func() (*types.Result, error)
+		wantResult *types.Result
 		wantHit    bool
 		wantErr    bool
 	}{
@@ -73,10 +73,10 @@ func TestCache_GetOrFetch(t *testing.T) {
 			name:  "cache miss - successful fetch",
 			setup: func(c *Cache) {},
 			key:   "test-key",
-			fetchFunc: func() (*search.Result, error) {
-				return &search.Result{ProvidersTotal: 5}, nil
+			fetchFunc: func() (*types.Result, error) {
+				return &types.Result{ProvidersTotal: 5}, nil
 			},
-			wantResult: &search.Result{ProvidersTotal: 5},
+			wantResult: &types.Result{ProvidersTotal: 5},
 			wantHit:    false,
 			wantErr:    false,
 		},
@@ -85,17 +85,17 @@ func TestCache_GetOrFetch(t *testing.T) {
 			setup: func(c *Cache) {
 				c.mu.Lock()
 				c.entries["cached-key"] = &cacheEntry{
-					result:    &search.Result{ProvidersTotal: 10},
+					result:    &types.Result{ProvidersTotal: 10},
 					expiresAt: time.Now().Add(time.Minute),
 				}
 				c.mu.Unlock()
 			},
 			key: "cached-key",
-			fetchFunc: func() (*search.Result, error) {
+			fetchFunc: func() (*types.Result, error) {
 				t.Error("fetch should not be called for cached entry")
 				return nil, nil
 			},
-			wantResult: &search.Result{ProvidersTotal: 10},
+			wantResult: &types.Result{ProvidersTotal: 10},
 			wantHit:    true,
 			wantErr:    false,
 		},
@@ -103,7 +103,7 @@ func TestCache_GetOrFetch(t *testing.T) {
 			name:  "fetch error - not cached",
 			setup: func(c *Cache) {},
 			key:   "error-key",
-			fetchFunc: func() (*search.Result, error) {
+			fetchFunc: func() (*types.Result, error) {
 				return nil, errors.New("fetch failed")
 			},
 			wantResult: nil,
@@ -114,7 +114,7 @@ func TestCache_GetOrFetch(t *testing.T) {
 			name:  "fetch returns nil result - not cached",
 			setup: func(c *Cache) {},
 			key:   "nil-key",
-			fetchFunc: func() (*search.Result, error) {
+			fetchFunc: func() (*types.Result, error) {
 				return nil, nil
 			},
 			wantResult: nil,
@@ -126,16 +126,16 @@ func TestCache_GetOrFetch(t *testing.T) {
 			setup: func(c *Cache) {
 				c.mu.Lock()
 				c.entries["expired-key"] = &cacheEntry{
-					result:    &search.Result{ProvidersTotal: 1},
+					result:    &types.Result{ProvidersTotal: 1},
 					expiresAt: time.Now().Add(-time.Minute),
 				}
 				c.mu.Unlock()
 			},
 			key: "expired-key",
-			fetchFunc: func() (*search.Result, error) {
-				return &search.Result{ProvidersTotal: 99}, nil
+			fetchFunc: func() (*types.Result, error) {
+				return &types.Result{ProvidersTotal: 99}, nil
 			},
-			wantResult: &search.Result{ProvidersTotal: 99},
+			wantResult: &types.Result{ProvidersTotal: 99},
 			wantHit:    false,
 			wantErr:    false,
 		},
@@ -183,10 +183,10 @@ func TestCache_GetOrFetch_ContextCancellation(t *testing.T) {
 
 	// Start a slow fetch
 	go func() {
-		_, _, _ = cache.GetOrFetch(context.Background(), "slow-key", func() (*search.Result, error) {
+		_, _, _ = cache.GetOrFetch(context.Background(), "slow-key", func() (*types.Result, error) {
 			close(fetchStarted)
 			<-fetchDone
-			return &search.Result{ProvidersTotal: 1}, nil
+			return &types.Result{ProvidersTotal: 1}, nil
 		})
 	}()
 
@@ -196,7 +196,7 @@ func TestCache_GetOrFetch_ContextCancellation(t *testing.T) {
 	cancel()
 
 	// Try to get the same key with cancelled context
-	_, _, err := cache.GetOrFetch(ctx, "slow-key", func() (*search.Result, error) {
+	_, _, err := cache.GetOrFetch(ctx, "slow-key", func() (*types.Result, error) {
 		t.Error("fetch should not be called - should wait for inflight")
 		return nil, nil
 	})
@@ -223,12 +223,12 @@ func TestCache_GetOrFetch_Singleflight(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			result, _, err := cache.GetOrFetch(context.Background(), "shared-key", func() (*search.Result, error) {
+			result, _, err := cache.GetOrFetch(context.Background(), "shared-key", func() (*types.Result, error) {
 				if fetchCount.Add(1) == 1 {
 					close(fetchStarted)
 					<-fetchContinue
 				}
-				return &search.Result{ProvidersTotal: 42}, nil
+				return &types.Result{ProvidersTotal: 42}, nil
 			})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -283,7 +283,7 @@ func TestCache_Invalidate(t *testing.T) {
 			for _, key := range tt.setupKeys {
 				cache.mu.Lock()
 				cache.entries[key] = &cacheEntry{
-					result:    &search.Result{},
+					result:    &types.Result{},
 					expiresAt: time.Now().Add(time.Minute),
 				}
 				cache.mu.Unlock()
@@ -330,7 +330,7 @@ func TestCache_Clear(t *testing.T) {
 			for _, key := range tt.setupKeys {
 				cache.mu.Lock()
 				cache.entries[key] = &cacheEntry{
-					result:    &search.Result{},
+					result:    &types.Result{},
 					expiresAt: time.Now().Add(time.Minute),
 				}
 				cache.mu.Unlock()
@@ -355,7 +355,7 @@ func TestCache_NilResultNotCached(t *testing.T) {
 	callCount := 0
 
 	// First call - returns nil
-	result, hit, err := cache.GetOrFetch(context.Background(), "nil-key", func() (*search.Result, error) {
+	result, hit, err := cache.GetOrFetch(context.Background(), "nil-key", func() (*types.Result, error) {
 		callCount++
 		return nil, nil
 	})
@@ -370,9 +370,9 @@ func TestCache_NilResultNotCached(t *testing.T) {
 	}
 
 	// Second call - should fetch again (nil not cached)
-	result, hit, err = cache.GetOrFetch(context.Background(), "nil-key", func() (*search.Result, error) {
+	result, hit, err = cache.GetOrFetch(context.Background(), "nil-key", func() (*types.Result, error) {
 		callCount++
-		return &search.Result{ProvidersTotal: 1}, nil
+		return &types.Result{ProvidersTotal: 1}, nil
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -397,7 +397,7 @@ func TestCache_ErrorNotCached(t *testing.T) {
 	callCount := 0
 
 	// First call - returns error
-	_, hit, err := cache.GetOrFetch(context.Background(), "error-key", func() (*search.Result, error) {
+	_, hit, err := cache.GetOrFetch(context.Background(), "error-key", func() (*types.Result, error) {
 		callCount++
 		return nil, fetchErr
 	})
@@ -409,9 +409,9 @@ func TestCache_ErrorNotCached(t *testing.T) {
 	}
 
 	// Second call - should fetch again (error not cached)
-	result, hit, err := cache.GetOrFetch(context.Background(), "error-key", func() (*search.Result, error) {
+	result, hit, err := cache.GetOrFetch(context.Background(), "error-key", func() (*types.Result, error) {
 		callCount++
-		return &search.Result{ProvidersTotal: 1}, nil
+		return &types.Result{ProvidersTotal: 1}, nil
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

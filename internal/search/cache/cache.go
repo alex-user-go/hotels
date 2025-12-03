@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alex-user-go/hotels/internal/search"
+	"github.com/alex-user-go/hotels/internal/search/types"
 )
 
 // Cache provides in-memory caching with TTL and request collapsing (singleflight).
@@ -19,13 +19,13 @@ type Cache struct {
 }
 
 type cacheEntry struct {
-	result    *search.Result
+	result    *types.Result
 	expiresAt time.Time
 }
 
 type inflightRequest struct {
 	done   chan struct{}
-	result *search.Result
+	result *types.Result
 	err    error
 }
 
@@ -57,7 +57,7 @@ func (c *Cache) Key(city, checkin string, nights, adults int) string {
 // GetOrFetch retrieves from cache or executes the fetch function.
 // Concurrent requests for the same key are collapsed (singleflight pattern).
 // Returns the result and a boolean indicating if it was a cache hit.
-func (c *Cache) GetOrFetch(ctx context.Context, key string, fetch func() (*search.Result, error)) (*search.Result, bool, error) {
+func (c *Cache) GetOrFetch(ctx context.Context, key string, fetch func() (*types.Result, error)) (*types.Result, bool, error) {
 	c.mu.Lock()
 
 	// Check cache

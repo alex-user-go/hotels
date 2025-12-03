@@ -10,23 +10,8 @@ import (
 
 	"github.com/alex-user-go/hotels/internal/obs"
 	"github.com/alex-user-go/hotels/internal/providers"
+	"github.com/alex-user-go/hotels/internal/search/types"
 )
-
-// Result represents aggregated search results.
-type Result struct {
-	Hotels             []Hotel `json:"hotels"`
-	ProvidersTotal     int     `json:"-"`
-	ProvidersSucceeded int     `json:"-"`
-	ProvidersFailed    int     `json:"-"`
-}
-
-// Hotel represents a normalized hotel.
-type Hotel struct {
-	HotelID  string  `json:"hotel_id"`
-	Name     string  `json:"name"`
-	Currency string  `json:"currency"`
-	Price    float64 `json:"price"`
-}
 
 // Aggregator aggregates results from multiple providers.
 type Aggregator struct {
@@ -47,14 +32,14 @@ func NewAggregator(providers []providers.Provider, timeout time.Duration, metric
 }
 
 // Search queries all providers concurrently and aggregates results.
-func (a *Aggregator) Search(ctx context.Context, city, checkin string, nights, adults int) (*Result, error) {
+func (a *Aggregator) Search(ctx context.Context, city, checkin string, nights, adults int) (*types.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
 
 	var (
 		mu        sync.Mutex
 		wg        sync.WaitGroup
-		hotelMap  = make(map[string]Hotel)
+		hotelMap  = make(map[string]types.Hotel)
 		succeeded int
 		failed    int
 		errors    []error
@@ -110,7 +95,7 @@ func (a *Aggregator) Search(ctx context.Context, city, checkin string, nights, a
 	}
 
 	// Convert map to slice and sort by price
-	hotels := make([]Hotel, 0, len(hotelMap))
+	hotels := make([]types.Hotel, 0, len(hotelMap))
 	for _, h := range hotelMap {
 		hotels = append(hotels, h)
 	}
@@ -118,7 +103,7 @@ func (a *Aggregator) Search(ctx context.Context, city, checkin string, nights, a
 		return hotels[i].Price < hotels[j].Price
 	})
 
-	return &Result{
+	return &types.Result{
 		Hotels:             hotels,
 		ProvidersTotal:     len(a.providers),
 		ProvidersSucceeded: succeeded,
@@ -126,7 +111,7 @@ func (a *Aggregator) Search(ctx context.Context, city, checkin string, nights, a
 	}, nil
 }
 
-func normalizeHotel(h providers.Hotel) *Hotel {
+func normalizeHotel(h providers.Hotel) *types.Hotel {
 	// Drop invalid data
 	hotelID := strings.TrimSpace(h.HotelID)
 	if hotelID == "" {
@@ -147,7 +132,7 @@ func normalizeHotel(h providers.Hotel) *Hotel {
 		currency = "EUR"
 	}
 
-	return &Hotel{
+	return &types.Hotel{
 		HotelID:  hotelID,
 		Name:     name,
 		Currency: currency,

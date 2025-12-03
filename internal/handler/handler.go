@@ -15,6 +15,7 @@ import (
 	"github.com/alex-user-go/hotels/internal/search"
 	"github.com/alex-user-go/hotels/internal/search/cache"
 	"github.com/alex-user-go/hotels/internal/search/ratelimit"
+	"github.com/alex-user-go/hotels/internal/search/types"
 )
 
 // Handler handles HTTP requests.
@@ -45,9 +46,9 @@ func New(
 
 // SearchResponse represents the complete API response.
 type SearchResponse struct {
-	Search SearchInfo     `json:"search"`
-	Stats  SearchStats    `json:"stats"`
-	Hotels []search.Hotel `json:"hotels"`
+	Search SearchInfo    `json:"search"`
+	Stats  SearchStats   `json:"stats"`
+	Hotels []types.Hotel `json:"hotels"`
 }
 
 // SearchInfo contains the search parameters.
@@ -93,7 +94,7 @@ func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	key := h.cache.Key(params.City, params.Checkin, params.Nights, params.Adults)
 
 	// Get or fetch from cache
-	result, cacheHit, err := h.cache.GetOrFetch(r.Context(), key, func() (*search.Result, error) {
+	result, cacheHit, err := h.cache.GetOrFetch(r.Context(), key, func() (*types.Result, error) {
 		return h.aggregator.Search(r.Context(), params.City, params.Checkin, params.Nights, params.Adults)
 	})
 
